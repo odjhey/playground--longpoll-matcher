@@ -1,0 +1,17 @@
+{
+  "name": "playground--longpoll-matcher",
+  "version": "0.0.1",
+  "author": "odjhey <odjhey@gmail.com>",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"yarn workspace api dev\" \"yarn workspace web dev\""
+  },
+  "workspaces": [
+    "web",
+    "api",
+    "packages/*"
+  ],
+  "devDependencies": {
+    "concurrently": "^7.6.0"
+  }
+}
