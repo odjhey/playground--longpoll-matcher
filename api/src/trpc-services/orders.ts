@@ -58,6 +58,13 @@ export const ordersRouter = router({
       return { failed: true };
     }),
 
+  commitments: publicProcedure.query(() => {
+    const keys = Object.keys(matchRequests).filter((k) => {
+      return matchRequests[k].matched;
+    });
+    return keys;
+  }),
+
   // we can also use a 2-step proccess for finer request tracking
   // request Id, so client takes a hold of a reqId, then let client operate with that reqId until fulfilled
   // Warning: this is a long polling operation, will not return agad and will wait indefinitely (or until timeout config is met)

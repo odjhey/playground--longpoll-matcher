@@ -7,6 +7,7 @@ export default () => {
   const orders = trpc.orders.list.useQuery();
   const clearOrders = trpc.orders.clear.useMutation();
   const fulfill = trpc.orders.fulfill.useMutation();
+  const commitments = trpc.orders.commitments.useQuery();
 
   return (
     <>
@@ -61,12 +62,15 @@ export default () => {
           <div>
             <button
               onClick={() => {
-                fulfill.mutateAsync({ name: "john cena" });
+                fulfill.mutateAsync({ name: "john cena" }).then(() => {
+                  commitments.refetch();
+                });
               }}
               className="btn btn-xs btn-accent"
             >
               match
             </button>
+            <pre>{JSON.stringify(commitments.data, null, 2)}</pre>
           </div>
         </div>
       </div>
