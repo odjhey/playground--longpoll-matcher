@@ -1,9 +1,10 @@
 import { trpc } from "../utils/trpc";
 import NewOrderReqForm from "./NewOrderReqForm";
-import { SymbolIcon } from "@radix-ui/react-icons";
+import { SymbolIcon, TrashIcon } from "@radix-ui/react-icons";
 
 export default () => {
   const orders = trpc.orders.list.useQuery();
+  const clearOrders = trpc.orders.clear.useMutation();
 
   return (
     <>
@@ -12,12 +13,23 @@ export default () => {
         <div className="p-1">
           <div className="flex gap-1 items-center">
             <p className="text-lg">Requests</p>
-            <button className="btn btn-xs">
-              <SymbolIcon
-                onClick={() => {
+            <button
+              onClick={() => {
+                orders.refetch();
+              }}
+              className="btn btn-xs"
+            >
+              <SymbolIcon></SymbolIcon>
+            </button>
+            <button
+              onClick={() => {
+                clearOrders.mutateAsync().then(() => {
                   orders.refetch();
-                }}
-              ></SymbolIcon>
+                });
+              }}
+              className="btn btn-xs"
+            >
+              <TrashIcon></TrashIcon>
             </button>
           </div>
 
@@ -25,7 +37,11 @@ export default () => {
           <pre>{JSON.stringify(orders.data, null, 2)}</pre>
         </div>
         <div className="p-1">
-          <NewOrderReqForm></NewOrderReqForm>
+          <NewOrderReqForm
+            afterSubmit={() => {
+              orders.refetch();
+            }}
+          ></NewOrderReqForm>
         </div>
       </div>
     </>

@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import { nanoid } from "nanoid";
 import { z } from "zod";
 import { publicProcedure, router } from "../trpc/trpc";
 
@@ -14,11 +14,15 @@ export const ordersRouter = router({
   list: publicProcedure.query(() => {
     return orders;
   }),
+  clear: publicProcedure.mutation(() => {
+    orders = {};
+    return orders;
+  }),
   new: publicProcedure
     .input(z.object({ by: z.string(), details: z.string() }))
     .mutation(({ input }) => {
       const { by, details } = input;
-      const key = randomUUID();
+      const key = nanoid();
       orders[key] = { by, details };
       return orders;
     }),

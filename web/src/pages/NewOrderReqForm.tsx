@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { trpc } from "../utils/trpc";
 
-export default () => {
+export default ({ afterSubmit }: { afterSubmit: () => void }) => {
   const formMethods = useForm<{ by: string; details: string }>();
   const newOrder = trpc.orders.new.useMutation();
 
@@ -10,9 +10,13 @@ export default () => {
       <p className="text-lg">New Request</p>
       <form
         onSubmit={formMethods.handleSubmit((data) => {
-          newOrder.mutate({
-            ...data,
-          });
+          newOrder
+            .mutateAsync({
+              ...data,
+            })
+            .then(() => {
+              afterSubmit();
+            });
         })}
       >
         <input
