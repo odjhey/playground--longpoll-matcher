@@ -13,6 +13,10 @@ let matchRequests: {
 } = {};
 
 export const ordersRouter = router({
+  reset: publicProcedure.mutation(() => {
+    orders = {};
+    matchRequests = {};
+  }),
   list: publicProcedure.query(() => {
     return orders;
   }),

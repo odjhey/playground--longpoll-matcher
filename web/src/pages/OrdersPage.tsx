@@ -8,6 +8,7 @@ export default () => {
   const clearOrders = trpc.orders.clear.useMutation();
   const fulfill = trpc.orders.fulfill.useMutation();
   const commitments = trpc.orders.commitments.useQuery();
+  const reset = trpc.orders.reset.useMutation();
 
   return (
     <>
@@ -41,6 +42,17 @@ export default () => {
                 className="btn btn-xs"
               >
                 <TrashIcon></TrashIcon>
+              </button>
+              <button
+                onClick={() => {
+                  reset.mutateAsync().then(() => {
+                    orders.refetch();
+                    commitments.refetch();
+                  });
+                }}
+                className="btn btn-xs"
+              >
+                reset
               </button>
             </div>
 
