@@ -1,6 +1,7 @@
 import { trpc } from "../utils/trpc";
 import NewOrderReqForm from "./NewOrderReqForm";
 import { SymbolIcon, TrashIcon } from "@radix-ui/react-icons";
+import Order from "./Order";
 
 export default () => {
   const orders = trpc.orders.list.useQuery();
@@ -34,7 +35,12 @@ export default () => {
           </div>
 
           <p>{orders.isLoading}</p>
-          <pre>{JSON.stringify(orders.data, null, 2)}</pre>
+          <>
+            {orders.data &&
+              Object.keys(orders.data).map((k) => {
+                return <Order key={k} orderId={k} {...orders.data[k]}></Order>;
+              })}
+          </>
         </div>
         <div className="p-1">
           <NewOrderReqForm
