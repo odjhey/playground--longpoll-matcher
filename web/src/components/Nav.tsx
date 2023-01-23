@@ -12,6 +12,11 @@ export const Nav = () => {
               </NavLink>
             </li>
             <li>
+              <NavLink to="/orders" className="p-0 px-1">
+                Orders
+              </NavLink>
+            </li>
+            <li>
               <NavLink to="/about" className="p-0 px-1">
                 About
               </NavLink>
