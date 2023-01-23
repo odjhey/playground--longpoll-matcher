@@ -59,6 +59,7 @@ export default () => {
           <p className="text-lg">Fulfiller (john cena)</p>
           {fulfill.isLoading}
           <pre>{JSON.stringify(fulfill.data)}</pre>
+          <p>{fulfill.isLoading ? "loading" : "-"}</p>
           <div>
             <button
               onClick={() => {

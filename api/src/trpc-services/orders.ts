@@ -33,29 +33,59 @@ export const ordersRouter = router({
   fulfill: publicProcedure
     .input(z.object({ name: z.string() }))
     .mutation(({ input }) => {
-      // add conditions
+      return new Promise<{ failed: true } | { orderId: string }>(
+        async (res, rej) => {
+          let fulfillTimer = 0;
+          let matchKey = "";
 
-      // wait for orders
-      const orderKey = Object.keys(matchRequests).find((k) => {
-        if (
-          !matchRequests[k].isRetryDone &&
-          matchRequests[k].matched === false
-        ) {
-          return true;
+          // wait for orders
+          // this needs to be a Sync operation,
+          // lets wait for `matchReq` to be mutated outside
+          // of this request
+          while (true) {
+            console.log("fulfillTimer", fulfillTimer);
+
+            // wait for ~30seconds if no match, trying every second
+            if (fulfillTimer > 30) {
+              break;
+            }
+            fulfillTimer++;
+
+            const orderKey = Object.keys(matchRequests).find((k) => {
+              if (
+                !matchRequests[k].isRetryDone &&
+                matchRequests[k].matched === false
+              ) {
+                return true;
+              }
+            });
+
+            if (orderKey) {
+              matchKey = orderKey;
+              break;
+            }
+
+            // wait for a second before retrying
+            await new Promise((timerResolve, rej) => {
+              setTimeout(() => {
+                timerResolve({});
+              }, 1000);
+            });
+          }
+
+          // Warning! below is sensitive, due to reference chuchu, careful
+          if (matchKey) {
+            const m = matchRequests[matchKey];
+            m.matched = true;
+            if (m.matched) {
+              m.with = { name: input.name };
+            }
+            res({ orderId: matchKey });
+          }
+
+          res({ failed: true });
         }
-      });
-
-      if (orderKey) {
-        // Warning! below is sensitive, due to reference chuchu, careful
-        const m = matchRequests[orderKey];
-        m.matched = true;
-        if (m.matched) {
-          m.with = { name: input.name };
-        }
-        return { orderId: orderKey };
-      }
-
-      return { failed: true };
+      );
     }),
 
   commitments: publicProcedure.query(() => {
