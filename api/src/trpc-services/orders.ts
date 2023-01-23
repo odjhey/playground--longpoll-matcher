@@ -8,8 +8,8 @@ let orders: { [id: string]: { by: string; details: string } } = {};
 // move me to some redis or sumthin
 let matchRequests: {
   [orderId: string]:
-    | { matched: true; isDone: boolean; with: { name: string } }
-    | { matched: false; isDone: boolean };
+    | { matched: true; isRetryDone: boolean; with: { name: string } }
+    | { matched: false; isRetryDone: boolean };
 } = {};
 
 export const ordersRouter = router({
@@ -29,6 +29,35 @@ export const ordersRouter = router({
       return orders;
     }),
 
+  // TODO: better to create another list of below then feed both to matchmaking algo
+  fulfill: publicProcedure
+    .input(z.object({ name: z.string() }))
+    .mutation(({ input }) => {
+      // add conditions
+
+      // wait for orders
+      const orderKey = Object.keys(matchRequests).find((k) => {
+        if (
+          !matchRequests[k].isRetryDone &&
+          matchRequests[k].matched === false
+        ) {
+          return true;
+        }
+      });
+
+      if (orderKey) {
+        // Warning! below is sensitive, due to reference chuchu, careful
+        const m = matchRequests[orderKey];
+        m.matched = true;
+        if (m.matched) {
+          m.with = { name: input.name };
+        }
+        return { orderId: orderKey };
+      }
+
+      return { failed: true };
+    }),
+
   // we can also use a 2-step proccess for finer request tracking
   // request Id, so client takes a hold of a reqId, then let client operate with that reqId until fulfilled
   // Warning: this is a long polling operation, will not return agad and will wait indefinitely (or until timeout config is met)
@@ -39,7 +68,7 @@ export const ordersRouter = router({
         // init
         matchRequests[input.orderId] = {
           matched: false,
-          isDone: false,
+          isRetryDone: false,
         };
       }
 
@@ -56,7 +85,7 @@ export const ordersRouter = router({
           while (true) {
             console.log("timer", timer);
 
-            if (matchReq.isDone) {
+            if (matchReq.isRetryDone) {
               break;
             }
 
@@ -67,7 +96,7 @@ export const ordersRouter = router({
 
             // wait for ~30seconds if no match, trying every second
             if (timer > 30) {
-              matchReq.isDone = true;
+              matchReq.isRetryDone = true;
               break;
             }
             timer++;
