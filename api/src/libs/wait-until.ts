@@ -36,3 +36,11 @@ export async function waitUntil<S extends Record<string, any>, D>(
 
   return { ok: true, data: p.fin(currentState) };
 }
+
+export const waitOneSec = () => {
+  return new Promise((res) => {
+    setTimeout(() => {
+      res({});
+    }, 1000);
+  });
+};

@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import { z } from "zod";
-import { waitUntil } from "../libs/wait-until";
+import { waitOneSec, waitUntil } from "../libs/wait-until";
 import { publicProcedure, router } from "../trpc/trpc";
 
 // move me to some database
@@ -55,13 +55,7 @@ export const ordersRouter = router({
           }
           return [false, prevState];
         },
-        waitFn: () => {
-          return new Promise((res) => {
-            setTimeout(() => {
-              res({});
-            }, 1000);
-          });
-        },
+        waitFn: waitOneSec,
         fin: (state) => {
           // Warning! below is sensitive, due to reference chuchu, careful
           const m = matchRequests[state.matchKey];
