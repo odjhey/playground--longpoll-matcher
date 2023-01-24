@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { waitUntil } from "../libs/wait-until";
 import { publicProcedure, router } from "../trpc/trpc";
 
 // move me to some database
@@ -36,60 +37,47 @@ export const ordersRouter = router({
   // TODO: better to create another list of below then feed both to matchmaking algo
   fulfill: publicProcedure
     .input(z.object({ name: z.string() }))
-    .mutation(({ input }) => {
-      return new Promise<{ failed: true } | { orderId: string }>(
-        async (res, rej) => {
-          let fulfillTimer = 0;
-          let matchKey = "";
-
-          // wait for orders
-          // this needs to be a Sync operation,
-          // lets wait for `matchReq` to be mutated outside
-          // of this request
-          while (true) {
-            console.log("fulfillTimer", fulfillTimer);
-
-            // wait for ~30seconds if no match, trying every second
-            if (fulfillTimer > 30) {
-              break;
+    .mutation(async ({ input }) => {
+      const v = await waitUntil({
+        initState: { matchKey: "" },
+        doStillWaitPredicate: (prevState) => {
+          const orderKey = Object.keys(matchRequests).find((k) => {
+            if (
+              !matchRequests[k].isRetryDone &&
+              matchRequests[k].matched === false
+            ) {
+              return true;
             }
-            fulfillTimer++;
+          });
 
-            const orderKey = Object.keys(matchRequests).find((k) => {
-              if (
-                !matchRequests[k].isRetryDone &&
-                matchRequests[k].matched === false
-              ) {
-                return true;
-              }
-            });
-
-            if (orderKey) {
-              matchKey = orderKey;
-              break;
-            }
-
-            // wait for a second before retrying
-            await new Promise((timerResolve, rej) => {
-              setTimeout(() => {
-                timerResolve({});
-              }, 1000);
-            });
+          if (orderKey) {
+            return [true, { matchKey: orderKey }];
           }
-
+          return [false, prevState];
+        },
+        waitFn: () => {
+          return new Promise((res) => {
+            setTimeout(() => {
+              res({});
+            }, 1000);
+          });
+        },
+        fin: (state) => {
           // Warning! below is sensitive, due to reference chuchu, careful
-          if (matchKey) {
-            const m = matchRequests[matchKey];
-            m.matched = true;
-            if (m.matched) {
-              m.with = { name: input.name };
-            }
-            res({ orderId: matchKey });
+          const m = matchRequests[state.matchKey];
+          m.matched = true;
+          if (m.matched) {
+            m.with = { name: input.name };
           }
+          return { orderId: state.matchKey };
+        },
+      });
 
-          res({ failed: true });
-        }
-      );
+      if (v.ok) {
+        return v.data;
+      }
+
+      return { failed: true, message: v.message };
     }),
 
   commitments: publicProcedure.query(() => {
