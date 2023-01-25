@@ -3,9 +3,9 @@ export async function waitUntil<S extends Record<string, any>, D>(
     initState: S;
     doStillWaitPredicate: (state: S) => Promise<[boolean, S]> | [boolean, S];
     waitFn: () => Promise<unknown>;
-    fin: (state: S) => D;
+    afterSuccess: (state: S) => D;
   },
-  options: { maxRetries: number } = { maxRetries: 30 }
+  options: { maxRetries: number } = { maxRetries: 10 }
 ): Promise<{ ok: false; message: string } | { ok: true; data: D }> {
   let currentState = p.initState;
 
@@ -34,7 +34,7 @@ export async function waitUntil<S extends Record<string, any>, D>(
     return { ok: false, message: "Timeout" };
   }
 
-  return { ok: true, data: p.fin(currentState) };
+  return { ok: true, data: p.afterSuccess(currentState) };
 }
 
 export const waitOneSec = () => {

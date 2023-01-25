@@ -56,7 +56,7 @@ export const ordersRouter = router({
           return [false, prevState];
         },
         waitFn: waitOneSec,
-        fin: (state) => {
+        afterSuccess: (state) => {
           // Warning! below is sensitive, due to reference chuchu, careful
           const m = matchRequests[state.matchKey];
           m.matched = true;
@@ -86,7 +86,7 @@ export const ordersRouter = router({
   // Warning: this is a long polling operation, will not return agad and will wait indefinitely (or until timeout config is met)
   findMatch: publicProcedure
     .input(z.object({ orderId: z.string() }))
-    .mutation(({ input }) => {
+    .mutation(async ({ input }) => {
       if (!matchRequests[input.orderId]) {
         // init
         matchRequests[input.orderId] = {
@@ -97,47 +97,31 @@ export const ordersRouter = router({
 
       const matchReq = matchRequests[input.orderId];
 
-      // Caution, this could be a main source of damning leaks
-      return new Promise<{ with: { name: string } } | { failed: true }>(
-        async (res, rej) => {
-          let timer = 0;
-
+      const v = await waitUntil({
+        initState: {},
+        waitFn: waitOneSec,
+        doStillWaitPredicate: (prevState) => {
           // this needs to be a Sync operation,
           // lets wait for `matchReq` to be mutated outside
           // of this request
-          while (true) {
-            console.log("timer", timer);
-
-            if (matchReq.isRetryDone) {
-              break;
-            }
-
-            if (matchReq.matched === true) {
-              // donezos
-              break;
-            }
-
-            // wait for ~30seconds if no match, trying every second
-            if (timer > 30) {
-              matchReq.isRetryDone = true;
-              break;
-            }
-            timer++;
-
-            // wait for a second before retrying
-            await new Promise((timerResolve, rej) => {
-              setTimeout(() => {
-                timerResolve({});
-              }, 1000);
-            });
+          if (matchReq.matched === true) {
+            return [true, prevState];
           }
-
+          return [false, prevState];
+        },
+        afterSuccess: () => {
           if (matchReq.matched) {
-            res({ with: matchReq.with });
-          } else {
-            res({ failed: true });
+            return { with: matchReq.with };
           }
-        }
-      );
+          return { with: "" };
+        },
+      });
+
+      matchReq.isRetryDone = true;
+      if (v.ok) {
+        return v.data;
+      }
+
+      return { failed: true, message: v.message };
     }),
 });
