@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { waitOneSec, waitUntil } from "../libs/wait-until";
 import { publicProcedure, router } from "../trpc/trpc";
 
 // move me to some database
@@ -36,60 +37,41 @@ export const ordersRouter = router({
   // TODO: better to create another list of below then feed both to matchmaking algo
   fulfill: publicProcedure
     .input(z.object({ name: z.string() }))
-    .mutation(({ input }) => {
-      return new Promise<{ failed: true } | { orderId: string }>(
-        async (res, rej) => {
-          let fulfillTimer = 0;
-          let matchKey = "";
-
-          // wait for orders
-          // this needs to be a Sync operation,
-          // lets wait for `matchReq` to be mutated outside
-          // of this request
-          while (true) {
-            console.log("fulfillTimer", fulfillTimer);
-
-            // wait for ~30seconds if no match, trying every second
-            if (fulfillTimer > 30) {
-              break;
+    .mutation(async ({ input }) => {
+      const v = await waitUntil({
+        initState: { matchKey: "" },
+        doStillWaitPredicate: (prevState) => {
+          const orderKey = Object.keys(matchRequests).find((k) => {
+            if (
+              !matchRequests[k].isRetryDone &&
+              matchRequests[k].matched === false
+            ) {
+              return true;
             }
-            fulfillTimer++;
+          });
 
-            const orderKey = Object.keys(matchRequests).find((k) => {
-              if (
-                !matchRequests[k].isRetryDone &&
-                matchRequests[k].matched === false
-              ) {
-                return true;
-              }
-            });
-
-            if (orderKey) {
-              matchKey = orderKey;
-              break;
-            }
-
-            // wait for a second before retrying
-            await new Promise((timerResolve, rej) => {
-              setTimeout(() => {
-                timerResolve({});
-              }, 1000);
-            });
+          if (orderKey) {
+            return [true, { matchKey: orderKey }];
           }
-
+          return [false, prevState];
+        },
+        waitFn: waitOneSec,
+        afterSuccess: (state) => {
           // Warning! below is sensitive, due to reference chuchu, careful
-          if (matchKey) {
-            const m = matchRequests[matchKey];
-            m.matched = true;
-            if (m.matched) {
-              m.with = { name: input.name };
-            }
-            res({ orderId: matchKey });
+          const m = matchRequests[state.matchKey];
+          m.matched = true;
+          if (m.matched) {
+            m.with = { name: input.name };
           }
+          return { orderId: state.matchKey };
+        },
+      });
 
-          res({ failed: true });
-        }
-      );
+      if (v.ok) {
+        return v.data;
+      }
+
+      return { failed: true, message: v.message };
     }),
 
   commitments: publicProcedure.query(() => {
@@ -104,7 +86,7 @@ export const ordersRouter = router({
   // Warning: this is a long polling operation, will not return agad and will wait indefinitely (or until timeout config is met)
   findMatch: publicProcedure
     .input(z.object({ orderId: z.string() }))
-    .mutation(({ input }) => {
+    .mutation(async ({ input }) => {
       if (!matchRequests[input.orderId]) {
         // init
         matchRequests[input.orderId] = {
@@ -115,47 +97,31 @@ export const ordersRouter = router({
 
       const matchReq = matchRequests[input.orderId];
 
-      // Caution, this could be a main source of damning leaks
-      return new Promise<{ with: { name: string } } | { failed: true }>(
-        async (res, rej) => {
-          let timer = 0;
-
+      const v = await waitUntil({
+        initState: {},
+        waitFn: waitOneSec,
+        doStillWaitPredicate: (prevState) => {
           // this needs to be a Sync operation,
           // lets wait for `matchReq` to be mutated outside
           // of this request
-          while (true) {
-            console.log("timer", timer);
-
-            if (matchReq.isRetryDone) {
-              break;
-            }
-
-            if (matchReq.matched === true) {
-              // donezos
-              break;
-            }
-
-            // wait for ~30seconds if no match, trying every second
-            if (timer > 30) {
-              matchReq.isRetryDone = true;
-              break;
-            }
-            timer++;
-
-            // wait for a second before retrying
-            await new Promise((timerResolve, rej) => {
-              setTimeout(() => {
-                timerResolve({});
-              }, 1000);
-            });
+          if (matchReq.matched === true) {
+            return [true, prevState];
           }
-
+          return [false, prevState];
+        },
+        afterSuccess: () => {
           if (matchReq.matched) {
-            res({ with: matchReq.with });
-          } else {
-            res({ failed: true });
+            return { with: matchReq.with };
           }
-        }
-      );
+          return { with: "" };
+        },
+      });
+
+      matchReq.isRetryDone = true;
+      if (v.ok) {
+        return v.data;
+      }
+
+      return { failed: true, message: v.message };
     }),
 });
